@@ -5,20 +5,15 @@ from django.contrib.auth.decorators import user_passes_test
 from django.db import models
 from datetime import date
 from .models import Usuario, Libro, Prestamo, Multa
+from datetime import datetime
 
 def iniciar_sesion(request):
     if request.method == 'POST':
-        usuario_input = request.POST.get('username', '').strip()
-        password_input = request.POST.get('password', '').strip()
+        usuario_input = request.POST.get('username')
+        password_input = request.POST.get('password')
         
-        # Criterio 3 HU-01: Campos vacíos
-        if not usuario_input or not password_input:
-            messages.warning(request, "Todos los campos son obligatorios.")
-            return render(request, 'biblioteca/login.html')
-            
         user = authenticate(request, username=usuario_input, password=password_input)
         
-        # Criterio 1 HU-01: Credenciales correctas
         if user is not None:
             if user.is_superuser or user.is_staff:
                 login(request, user)
@@ -26,8 +21,7 @@ def iniciar_sesion(request):
             else:
                 messages.error(request, "Acceso denegado: Solo el encargado de la biblioteca puede ingresar.")
         else:
-            # Criterio 2 HU-01: Credenciales incorrectas
-            messages.error(request, "Usuario o contraseña incorrectos. Por favor reintente.")
+            messages.error(request, "Usuario o contraseña incorrectos.")
             
     return render(request, 'biblioteca/login.html')
 
@@ -35,71 +29,52 @@ def cerrar_sesion(request):
     logout(request)
     return redirect('login')
 
-@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='login')
+@user_passes_test(lambda u: u.is_superuser, login_url='login')
 def panel_principal(request):
     if request.method == 'POST':
         accion = request.POST.get('accion')
         
-        # HU-02: Registro de Nuevos Libros
         if accion == 'crear_libro':
-            codigo = request.POST.get('codigo_libro', '').strip()
-            titulo = request.POST.get('titulo', '').strip()
-            autor = request.POST.get('autor', '').strip()
-            editorial = request.POST.get('editorial', '').strip()
-            anho_str = request.POST.get('anho', '').strip()
-            anho = int(anho_str) if anho_str else None
-            
-            if not codigo or not titulo or not autor:
-                messages.warning(request, "Todos los campos obligatorios deben ser completados.")
-            elif Libro.objects.filter(codigo=codigo).exists():
-                messages.error(request, f"Error: El código '{codigo}' ya está registrado en el sistema.")
-            else:
-                try:
-                    Libro.objects.create(
-                        codigo=codigo, 
-                        titulo=titulo, 
-                        autor=autor, 
-                        editorial=editorial if editorial else None, 
-                        anho=anho, 
-                        estado='Disponible'
-                    )
-                    messages.success(request, f"Libro '{titulo}' registrado exitosamente en el catálogo.")
-                except Exception as e:
-                    messages.error(request, f"Error al registrar el libro: {str(e)}")
-                    
-        # HU-03: Registro de Usuarios
+            codigo = request.POST.get('codigo_libro')
+            titulo = request.POST.get('titulo')
+            autor = request.POST.get('autor')
+            editorial = request.POST.get('editorial')
+            anho = request.POST.get('anho') or None
+            try:
+                Libro.objects.create(
+                    codigo=codigo, 
+                    titulo=titulo, 
+                    autor=autor, 
+                    editorial=editorial, 
+                    anho=anho, 
+                    estado='Disponible'
+                )
+                messages.success(request, f"Libro '{titulo}' registrado exitosamente.")
+            except Exception:
+                messages.error(request, "Error: El código del libro ya existe o los datos son inválidos.")
+                
         elif accion == 'crear_usuario':
-            rut = request.POST.get('rut_usuario', '').strip()
-            nombre = request.POST.get('nombre', '').strip()
-            correo = request.POST.get('correo', '').strip()
-            tipo = request.POST.get('tipo', '').strip()
-            
-            if not rut or not nombre or not correo:
-                messages.warning(request, "Todos los campos obligatorios deben ser completados.")
-            elif not tipo or tipo not in ['Estudiante', 'Docente']:
-                messages.warning(request, "Debe seleccionar un tipo de usuario válido (Estudiante o Docente).")
-            elif Usuario.objects.filter(rut=rut).exists():
-                messages.error(request, f"Error: El RUT '{rut}' ya está registrado en el sistema.")
-            else:
-                try:
-                    Usuario.objects.create(rut=rut, nombre=nombre, correo=correo, tipo=tipo)
-                    messages.success(request, f"Usuario '{nombre}' registrado exitosamente como {tipo}.")
-                except Exception as e:
-                    messages.error(request, f"Error al registrar el usuario: {str(e)}")
+            rut = request.POST.get('rut_usuario')
+            nombre = request.POST.get('nombre')
+            correo = request.POST.get('correo')
+            tipo = request.POST.get('tipo')
+            try:
+                Usuario.objects.create(rut=rut, nombre=nombre, correo=correo, tipo=tipo)
+                messages.success(request, f"Usuario '{nombre}' registrado exitosamente.")
+            except Exception:
+                messages.error(request, "Error: El RUT ya está registrado o los datos son inválidos.")
 
+    # MODIFICADO: Ahora cuenta únicamente los libros que están disponibles (resta los prestados)
     total_libros = Libro.objects.filter(estado='Disponible').count()
-    multas_activas = Multa.objects.filter(pagada=False).count()
     
     context = {
         'total_libros': total_libros,
-        'multas_activas': multas_activas,
     }
     return render(request, 'biblioteca/panel_principal.html', context)
 
-# HU-04 y HU-05: Solicitud de Préstamos
-@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='login')
+@user_passes_test(lambda u: u.is_superuser, login_url='login')
 def solicitar_prestamo(request):
-    query = request.GET.get('q', '').strip()
+    query = request.GET.get('q', '')
     libros_disponibles = Libro.objects.filter(estado='Disponible')
     if query:
         libros_disponibles = libros_disponibles.filter(
@@ -107,20 +82,25 @@ def solicitar_prestamo(request):
         )
 
     if request.method == 'POST':
-        rut = request.POST.get('rut', '').strip()
-        codigo = request.POST.get('codigo', '').strip()
+        rut = request.POST.get('rut')
+        codigo = request.POST.get('codigo')
 
         try:
             usuario = Usuario.objects.get(rut=rut)
             libro = Libro.objects.get(codigo=codigo)
 
-            # Criterio 3 HU-07 & Criterio 2 HU-04: Bloqueo de usuario con multa pendiente
             if usuario.multa_pendiente:
-                messages.error(request, f"Error: El usuario {usuario.nombre} tiene multas pendientes y debe cancelarlas antes de solicitar préstamos.")
+                messages.error(request, f"Error: El usuario {usuario.nombre} tiene multas pendientes.")
             elif libro.estado != 'Disponible':
                 messages.error(request, f"Error: El libro '{libro.titulo}' no está disponible.")
             else:
-                prestamo = Prestamo.objects.create(usuario=usuario, libro=libro)
+                # Crear el préstamo
+                Prestamo.objects.create(usuario=usuario, libro=libro)
+                
+                # MODIFICADO: Cambiar el estado del libro a 'Prestado' para que descuente del panel
+                libro.estado = 'Prestado'
+                libro.save()
+
                 messages.success(request, f"¡Préstamo registrado con éxito! Libro: {libro.titulo} | Usuario: {usuario.nombre}.")
 
         except Usuario.DoesNotExist:
@@ -134,8 +114,7 @@ def solicitar_prestamo(request):
     }
     return render(request, 'biblioteca/solicitar_prestamo.html', context)
 
-# HU-06 y HU-07: Devolución de Libro y Generación Automática de Multas
-@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='login')
+@user_passes_test(lambda u: u.is_superuser, login_url='login')
 def devolver_libro(request):
     prestamos_activos = Prestamo.objects.filter(devuelto=False).select_related('usuario', 'libro')
 
@@ -147,11 +126,11 @@ def devolver_libro(request):
             prestamo.devuelto = True
             prestamo.save()
             
+            # Devuelve el libro a estado 'Disponible' (esto sumará de nuevo al panel)
             prestamo.libro.estado = 'Disponible'
             prestamo.libro.save()
 
             hoy = date.today()
-            # HU-07 Criterio 1: Cálculo y registro de multa ($1.000 por día de atraso)
             if hoy > prestamo.fecha_devolucion:
                 dias_atraso = (hoy - prestamo.fecha_devolucion).days
                 monto_multa = dias_atraso * 1000
@@ -167,7 +146,7 @@ def devolver_libro(request):
                 prestamo.usuario.multa_pendiente = True
                 prestamo.usuario.save()
 
-                messages.warning(request, f"Libro devuelto con ATRASO ({dias_atraso} días). Se registró una multa de ${monto_multa} para {prestamo.usuario.nombre}.")
+                messages.warning(request, f"Libro devuelto con ATRASO ({dias_atraso} días). Se generó una multa de ${monto_multa} para {prestamo.usuario.nombre}.")
             else:
                 messages.success(request, f"¡Éxito! El libro '{prestamo.libro.titulo}' ha sido devuelto a tiempo y está disponible.")
 
@@ -181,8 +160,7 @@ def devolver_libro(request):
     }
     return render(request, 'biblioteca/devolver_libro.html', context)
 
-# HU-07 Criterio 2: Gestión y Pago de Multas
-@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='login')
+@user_passes_test(lambda u: u.is_superuser, login_url='login')
 def gestionar_multas(request):
     if request.method == 'POST':
         multa_id = request.POST.get('multa_id')
@@ -197,18 +175,17 @@ def gestionar_multas(request):
                 usuario.multa_pendiente = False
                 usuario.save()
 
-            messages.success(request, f"Multa de ${multa.monto} de {usuario.nombre} marcada como PAGADA con éxito. Usuario liberado.")
+            messages.success(request, f"Multa de ${multa.monto} de {usuario.nombre} marcada como PAGADA.")
         except Multa.DoesNotExist:
             messages.error(request, "Error: Multa no encontrada.")
 
-    multas_pendientes = Multa.objects.filter(pagada=False).select_related('usuario', 'prestamo__libro')
+    multas_pendientes = Multa.objects.filter(pagada=False)
     context = {
         'multas': multas_pendientes
     }
     return render(request, 'biblioteca/gestionar_multas.html', context)
 
-# HU-06: Renovación Única
-@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='login')
+@user_passes_test(lambda u: u.is_superuser, login_url='login')
 def renovar_prestamo_view(request):
     prestamos_activos = Prestamo.objects.filter(devuelto=False).select_related('usuario', 'libro')
 
@@ -231,23 +208,29 @@ def renovar_prestamo_view(request):
     }
     return render(request, 'biblioteca/renovar_prestamo.html', context)
 
-# HU-08 y HU-09: Reporte de Libros en Préstamo y Libros con Retraso
-@user_passes_test(lambda u: u.is_superuser or u.is_staff, login_url='login')
+@user_passes_test(lambda u: u.is_superuser, login_url='login')
 def ver_reportes(request):
     hoy = date.today()
     
-    # HU-08: Libros actualmente en préstamo
     prestamos_activos = Prestamo.objects.filter(devuelto=False).select_related('usuario', 'libro')
-    # HU-09: Libros con retraso en devolución
     prestamos_atrasados = prestamos_activos.filter(fecha_devolucion__lt=hoy)
+    multas_pendientes = Multa.objects.filter(pagada=False).select_related('usuario', 'prestamo__libro')
     
-    # Calculamos días de retraso y monto estimado para el reporte HU-09
-    for p in prestamos_atrasados:
-        p.dias_retraso = (hoy - p.fecha_devolucion).days
-        p.monto_multa_estimada = p.dias_retraso * 1000
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    prestamos_por_periodo = None
+    
+    if fecha_inicio and fecha_fin:
+        prestamos_por_periodo = Prestamo.objects.filter(
+            fecha_prestamo__range=[fecha_inicio, fecha_fin]
+        ).select_related('usuario', 'libro')
 
     context = {
         'prestamos_activos': prestamos_activos,
         'prestamos_atrasados': prestamos_atrasados,
+        'multas_pendientes': multas_pendientes,
+        'prestamos_por_periodo': prestamos_por_periodo,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
     }
     return render(request, 'biblioteca/reportes.html', context)
