@@ -26,17 +26,16 @@ class Libro(models.Model):
     def __str__(self):
         return self.titulo
 
-# HU-05: Cálculo Automático de Fecha de Devolución (días hábiles)
+# HU-05: Cálculo Automático de Fecha de Devolución
 def sumar_dias_habiles(fecha_inicio, dias):
     fecha_actual = fecha_inicio
     dias_agregados = 0
     while dias_agregados < dias:
         fecha_actual += timedelta(days=1)
-        if fecha_actual.weekday() < 5:  # Lunes (0) a Viernes (4)
+        if fecha_actual.weekday() < 5: 
             dias_agregados += 1
     return fecha_actual
 
-# HU-04 y HU-06: Modelo de Préstamo con Renovación Única
 class Prestamo(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     libro = models.ForeignKey(Libro, on_delete=models.CASCADE)
@@ -47,14 +46,12 @@ class Prestamo(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.pk: 
-            # HU-05: 5 días hábiles estudiante, 10 docente
             dias_prestamo = 5 if self.usuario.tipo == 'Estudiante' else 10
             self.fecha_devolucion = sumar_dias_habiles(date.today(), dias_prestamo)
             self.libro.estado = 'Prestado'
             self.libro.save()
         super().save(*args, **kwargs)
 
-    # HU-06: Renovación Única
     def renovar_prestamo(self):
         if not self.renovado:
             dias_prestamo = 5 if self.usuario.tipo == 'Estudiante' else 10
@@ -65,4 +62,17 @@ class Prestamo(models.Model):
         return False, "Error: Este préstamo ya utilizó su renovación única."
 
     def __str__(self):
-        return f"{self.libro.titulo} -> {self.usuario.nombre} (Vence: {self.fecha_devolucion})"
+        return f"{self.libro.titulo} -> {self.usuario.nombre}"
+
+# HU-07: Cálculo y Registro de Multas
+class Multa(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    prestamo = models.ForeignKey(Prestamo, on_delete=models.CASCADE)
+    dias_atraso = models.IntegerField()
+    monto = models.IntegerField() # $1000 por día de atraso
+    pagada = models.BooleanField(default=False)
+    fecha_generacion = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        estado = "Pagada" if self.pagada else "Pendiente"
+        return f"Multa de ${self.monto} - {self.usuario.nombre} ({estado})"

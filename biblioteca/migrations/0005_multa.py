@@ -1,0 +1,24 @@
+import django.db.models.deletion
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('biblioteca', '0004_libro_anho_libro_editorial'),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='Multa',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('dias_atraso', models.IntegerField()),
+                ('monto', models.IntegerField()),
+                ('pagada', models.BooleanField(default=False)),
+                ('fecha_generacion', models.DateField(auto_now_add=True)),
+                ('prestamo', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='biblioteca.prestamo')),
+                ('usuario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='biblioteca.usuario')),
+            ],
+        ),
+    ]

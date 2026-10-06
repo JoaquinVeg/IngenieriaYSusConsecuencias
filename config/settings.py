@@ -1,5 +1,5 @@
 """
-Django settings for config project - Sprint 2.
+Django settings for config project - Sprint 3.
 """
 
 from pathlib import Path
