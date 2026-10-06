@@ -26,7 +26,6 @@ class Libro(models.Model):
     def __str__(self):
         return self.titulo
 
-# HU-05: Cálculo Automático de Fecha de Devolución
 def sumar_dias_habiles(fecha_inicio, dias):
     fecha_actual = fecha_inicio
     dias_agregados = 0
@@ -61,10 +60,6 @@ class Prestamo(models.Model):
             return True, f"Préstamo renovado con éxito. Nueva fecha: {self.fecha_devolucion}"
         return False, "Error: Este préstamo ya utilizó su renovación única."
 
-    def __str__(self):
-        return f"{self.libro.titulo} -> {self.usuario.nombre}"
-
-# HU-07: Cálculo y Registro de Multas
 class Multa(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     prestamo = models.ForeignKey(Prestamo, on_delete=models.CASCADE)

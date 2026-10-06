@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Reportes del Sistema - Biblioteca Central (Sprint 3)</title>
+    <title>Reportes del Sistema - Biblioteca Central</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -12,11 +12,12 @@
         .table th { font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; background-color: #f8fafc !important; }
         .nav-pills .nav-link { color: #495057; font-weight: 500; border-radius: 0.5rem; transition: all 0.2s; }
         .nav-pills .nav-link.active { background-color: #1e293b; color: #fff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .form-control, .form-select { border-radius: 0.5rem; padding: 0.65rem 1rem; }
     </style>
 </head>
 <body>
 
-    <!-- Navbar Sprint 3 -->
+    <!-- Navbar Compartida -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container-fluid px-4">
             <a class="navbar-brand fw-bold" href="{% url 'panel_principal' %}"><i class="bi bi-book-half me-2 text-warning"></i>Biblioteca Central</a>
@@ -39,21 +40,31 @@
                 <i class="bi bi-file-earmark-bar-graph"></i>
             </div>
             <div>
-                <h2 class="fw-bold text-dark mb-1">Módulo de Reportes de Circulación</h2>
-                <p class="text-muted small mb-0">Consulta consolidada de libros en préstamo y libros con retraso en su devolución.</p>
+                <h2 class="fw-bold text-dark mb-1">Módulo de Reportes y Auditoría</h2>
+                <p class="text-muted small mb-0">Consulta consolidada de préstamos activos, retrasos y control de morosidad institucional.</p>
             </div>
         </div>
 
-        <!-- Pestañas de Navegación de Reportes (HU-08 y HU-09) -->
+        <!-- Pestañas de Navegación de Reportes -->
         <ul class="nav nav-pills gap-2 mb-4" id="reportTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active px-4 py-2" id="activos-tab" data-bs-toggle="tab" data-bs-target="#activos" type="button" role="tab">
-                    <i class="bi bi-journal-check me-2"></i>Libros Actualmente en Préstamo ({{ prestamos_activos.count }})
+                    <i class="bi bi-journal-check me-2"></i>Préstamos Activos ({{ prestamos_activos.count }})
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link px-4 py-2" id="atrasados-tab" data-bs-toggle="tab" data-bs-target="#atrasados" type="button" role="tab">
-                    <i class="bi bi-exclamation-triangle me-2"></i>Libros con Retraso en Devolución ({{ prestamos_atrasados.count }})
+                    <i class="bi bi-exclamation-triangle me-2"></i>Préstamos Atrasados ({{ prestamos_atrasados.count }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-4 py-2" id="multas-tab" data-bs-toggle="tab" data-bs-target="#multas" type="button" role="tab">
+                    <i class="bi bi-cash-coin me-2"></i>Multas Pendientes ({{ multas_pendientes.count }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-4 py-2" id="periodo-tab" data-bs-toggle="tab" data-bs-target="#periodo" type="button" role="tab">
+                    <i class="bi bi-calendar-range me-2"></i>Filtro por Período
                 </button>
             </li>
         </ul>
@@ -61,16 +72,16 @@
         <!-- Contenido de las Pestañas -->
         <div class="tab-content" id="reportTabsContent">
             
-            <!-- 1. HU-08: LIBROS ACTUALMENTE EN PRÉSTAMO -->
+            <!-- 1. PRÉSTAMOS ACTIVOS -->
             <div class="tab-pane fade show active" id="activos" role="tabpanel">
                 <div class="card card-custom bg-white p-4">
-                    <h5 class="fw-bold text-dark mb-3"><i class="bi bi-list-check me-2 text-primary"></i>Listado de Libros Prestados</h5>
+                    <h5 class="fw-bold text-dark mb-3"><i class="bi bi-list-check me-2 text-primary"></i>Listado de Préstamos Vigentes</h5>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle border-0">
                             <thead class="table-light text-secondary">
                                 <tr>
-                                    <th class="py-3 ps-3">Título y Código de Libro</th>
-                                    <th class="py-3">Usuario (Nombre y RUT)</th>
+                                    <th class="py-3 ps-3">Usuario (RUT y Tipo)</th>
+                                    <th class="py-3">Libro Prestado</th>
                                     <th class="py-3">Fecha de Préstamo</th>
                                     <th class="py-3 pe-3">Fecha Límite de Devolución</th>
                                 </tr>
@@ -79,23 +90,27 @@
                                 {% for p in prestamos_activos %}
                                     <tr>
                                         <td class="ps-3 fw-semibold text-dark">
-                                            {{ p.libro.titulo }} <br>
-                                            <span class="text-muted small">Cód: {{ p.libro.codigo }}</span>
+                                            {{ p.usuario.nombre }} <br>
+                                            <span class="text-muted small font-monospace">RUT: {{ p.usuario.rut }}</span>
+                                            <!-- Insignia del Tipo de Usuario -->
+                                            {% if p.usuario.tipo == 'Profesor' %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Profesor</span>
+                                            {% elif p.usuario.tipo == 'Estudiante' %}
+                                                <span class="badge bg-success bg-opacity-10 text-success ms-1">Estudiante</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">{{ p.usuario.tipo }}</span>
+                                            {% endif %}
                                         </td>
                                         <td>
-                                            {{ p.usuario.nombre }} <br>
-                                            <span class="text-muted small font-monospace">RUT: {{ p.usuario.rut }} ({{ p.usuario.tipo }})</span>
+                                            {{ p.libro.titulo }} <br>
+                                            <span class="text-muted small">Cód: {{ p.libro.codigo }}</span>
                                         </td>
                                         <td>{{ p.fecha_prestamo }}</td>
                                         <td class="pe-3 fw-semibold text-primary">{{ p.fecha_devolucion }}</td>
                                     </tr>
                                 {% empty %}
-                                    <!-- Criterio 2 HU-08: Reporte sin libros prestados -->
                                     <tr>
-                                        <td colspan="4" class="text-center py-5 text-muted">
-                                            <i class="bi bi-inbox display-5 text-muted opacity-50 mb-3 d-block"></i>
-                                            <p class="mb-0">Actualmente no hay libros en préstamo.</p>
-                                        </td>
+                                        <td colspan="4" class="text-center py-4 text-muted">No hay préstamos activos registrados actualmente.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -104,51 +119,167 @@
                 </div>
             </div>
 
-            <!-- 2. HU-09: LIBROS CON RETRASO EN DEVOLUCIÓN -->
+            <!-- 2. PRÉSTAMOS ATRASADOS -->
             <div class="tab-pane fade" id="atrasados" role="tabpanel">
                 <div class="card card-custom bg-white p-4">
-                    <h5 class="fw-bold text-danger mb-3"><i class="bi bi-exclamation-octagon me-2"></i>Libros con Devolución Vencida</h5>
+                    <h5 class="fw-bold text-danger mb-3"><i class="bi bi-exclamation-octagon me-2"></i>Préstamos con Vencimiento Expirado</h5>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle border-0">
                             <thead class="table-light text-secondary">
                                 <tr>
-                                    <th class="py-3 ps-3">Título y Código de Libro</th>
-                                    <th class="py-3">Usuario Moroso</th>
-                                    <th class="py-3 text-center">Días de Retraso</th>
-                                    <th class="py-3 text-end pe-3">Monto de Multa Calculado</th>
+                                    <th class="py-3 ps-3">Usuario (RUT y Tipo)</th>
+                                    <th class="py-3">Libro Afectado</th>
+                                    <th class="py-3">Fecha Límite</th>
+                                    <th class="py-3 text-center pe-3">Estado de Alerta</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for p in prestamos_atrasados %}
                                     <tr>
                                         <td class="ps-3 fw-semibold text-dark">
+                                            {{ p.usuario.nombre }} <br>
+                                            <span class="text-muted small font-monospace">RUT: {{ p.usuario.rut }}</span>
+                                            {% if p.usuario.tipo == 'Profesor' %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Profesor</span>
+                                            {% elif p.usuario.tipo == 'Estudiante' %}
+                                                <span class="badge bg-success bg-opacity-10 text-success ms-1">Estudiante</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">{{ p.usuario.tipo }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
                                             {{ p.libro.titulo }} <br>
                                             <span class="text-muted small">Cód: {{ p.libro.codigo }}</span>
                                         </td>
-                                        <td>
-                                            {{ p.usuario.nombre }} <br>
-                                            <span class="text-muted small font-monospace">RUT: {{ p.usuario.rut }}</span>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-1 font-monospace">{{ p.dias_retraso }} días</span>
-                                        </td>
-                                        <td class="text-end pe-3 fw-bold text-danger">
-                                            ${{ p.monto_multa_estimada }}
+                                        <td class="text-danger fw-semibold">{{ p.fecha_devolucion }}</td>
+                                        <td class="text-center pe-3">
+                                            <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-1">Atrasado</span>
                                         </td>
                                     </tr>
                                 {% empty %}
-                                    <!-- Criterio 2 HU-09: Reporte sin retrasos -->
                                     <tr>
-                                        <td colspan="4" class="text-center py-5 text-muted">
-                                            <i class="bi bi-check-circle display-5 text-success opacity-50 mb-3 d-block"></i>
-                                            <p class="mb-0">No hay libros con retraso en la devolución.</p>
-                                        </td>
+                                        <td colspan="4" class="text-center py-4 text-muted">¡Excelente! No hay préstamos con retraso pendiente.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
+            </div>
+
+            <!-- 3. MULTAS PENDIENTES -->
+            <div class="tab-pane fade" id="multas" role="tabpanel">
+                <div class="card card-custom bg-white p-4">
+                    <h5 class="fw-bold text-dark mb-3"><i class="bi bi-cash-stack me-2 text-danger"></i>Control de Morosidad y Multas</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle border-0">
+                            <thead class="table-light text-secondary">
+                                <tr>
+                                    <th class="py-3 ps-3">Usuario Moroso (RUT y Tipo)</th>
+                                    <th class="py-3">Libro de Referencia</th>
+                                    <th class="py-3 text-center">Días de Retraso</th>
+                                    <th class="py-3 text-end pe-3">Monto Deuda</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for m in multas_pendientes %}
+                                    <tr>
+                                        <td class="ps-3 fw-semibold text-dark">
+                                            {{ m.usuario.nombre }} <br>
+                                            <span class="text-muted small font-monospace">RUT: {{ m.usuario.rut }}</span>
+                                            {% if m.usuario.tipo == 'Profesor' %}
+                                                <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Profesor</span>
+                                            {% elif m.usuario.tipo == 'Estudiante' %}
+                                                <span class="badge bg-success bg-opacity-10 text-success ms-1">Estudiante</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">{{ m.usuario.tipo }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ m.prestamo.libro.titulo }}</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-warning bg-opacity-10 text-dark px-2 py-1">{{ m.dias_atraso }} días</span>
+                                        </td>
+                                        <td class="text-end pe-3 fw-bold text-danger">${{ m.monto }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">No existen multas pendientes de cobro en el sistema.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. FILTRO POR PERÍODO -->
+            <div class="tab-pane fade" id="periodo" role="tabpanel">
+                <div class="card card-custom bg-white p-4 mb-4">
+                    <h5 class="fw-bold text-dark mb-3"><i class="bi bi-funnel me-2 text-dark"></i>Seleccionar Rango de Fechas</h5>
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-5">
+                            <label for="fecha_inicio" class="form-label small fw-semibold text-muted">Fecha de Inicio:</label>
+                            <input type="date" class="form-control bg-light" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}">
+                        </div>
+                        <div class="col-md-5">
+                            <label for="fecha_fin" class="form-label small fw-semibold text-muted">Fecha de Fin:</label>
+                            <input type="date" class="form-control bg-light" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-dark w-100 py-2 fw-semibold shadow-sm">
+                                <i class="bi bi-search me-1"></i> Buscar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {% if prestamos_por_periodo is not None %}
+                    <div class="card card-custom bg-white p-4">
+                        <h6 class="fw-bold text-dark mb-3">Resultados para el período: <span class="text-primary">{{ fecha_inicio }}</span> al <span class="text-primary">{{ fecha_fin }}</span></h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border-0">
+                                <thead class="table-light text-secondary">
+                                    <tr>
+                                        <th class="py-3 ps-3">Usuario (RUT y Tipo)</th>
+                                        <th class="py-3">Libro</th>
+                                        <th class="py-3">Fecha Préstamo</th>
+                                        <th class="py-3 pe-3">Estado de Devolución</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for p in prestamos_por_periodo %}
+                                        <tr>
+                                            <td class="ps-3 fw-semibold text-dark">
+                                                {{ p.usuario.nombre }} <br>
+                                                <span class="text-muted small font-monospace">RUT: {{ p.usuario.rut }}</span>
+                                                {% if p.usuario.tipo == 'Profesor' %}
+                                                    <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Profesor</span>
+                                                {% elif p.usuario.tipo == 'Estudiante' %}
+                                                    <span class="badge bg-success bg-opacity-10 text-success ms-1">Estudiante</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">{{ p.usuario.tipo }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ p.libro.titulo }}</td>
+                                            <td>{{ p.fecha_prestamo }}</td>
+                                            <td class="pe-3">
+                                                {% if p.devuelto %}
+                                                    <span class="badge bg-success bg-opacity-10 text-success px-2 py-1">Devuelto</span>
+                                                {% else %}
+                                                    <span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1">Activo</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="text-center py-4 text-muted">No se encontraron registros en el rango de fechas seleccionado.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
 
         </div>
