@@ -1,7 +1,6 @@
 import pymysql
 pymysql.install_as_MySQLdb()
 
-# Parche para evitar que Django bloquee versiones de MySQL anteriores a la 8.4
 from django.db.backends.mysql.base import DatabaseWrapper
 def _is_mysql_8_4(self):
     return True
